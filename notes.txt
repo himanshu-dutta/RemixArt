@@ -1,3 +1,0 @@
-!!! Don't merge this branch with the master branch, it's just for us to maintain logs of changes.
-
-Adding the notes and changes related to the project, to keep track of it.
