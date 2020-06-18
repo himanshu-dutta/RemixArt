@@ -16,15 +16,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
-# template view for react frontend
+# template for rendering frontend
 from django.views.generic import TemplateView
 
-# media uri
+# media files route
 from django.conf import settings
 from django.conf.urls.static import static
 
-
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', TemplateView.as_view(template_name='index.html'))
+    path('', TemplateView.as_view(template_name='index.html')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

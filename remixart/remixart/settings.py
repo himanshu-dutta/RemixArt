@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 're@vo$^(uce_%^@jfom_*k*dxm)&k+vuw51vkj0dn2yf#zmnna'
+SECRET_KEY = '6npe8)9w4*lx%@%s)y7r&y-0!1xse!!1z@txh_-(u5e*5_hexx'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,12 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'corsheaders',            # cors-header for the server headers
-    'rest_framework',  # rest framework for apis
 ]
 
 MIDDLEWARE = [
-    # 'corsheaders.middleware.CorsMiddleware',  # cors-header middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,13 +50,13 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'remixart.urls'
-REACT_APP_DIR = os.path.join(BASE_DIR, 'frontend', 'build')
+
+Fronted_Path = os.path.join(BASE_DIR, 'frontend', 'build')
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [
-            REACT_APP_DIR,
-        ],
+        'DIRS': [Fronted_Path],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -110,7 +107,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Kolkata'
+TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
@@ -124,18 +121,10 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-
-# CORS_ORIGIN_WHITELIST = (
-#     'localhost:3000/'
-# )  # cors-header origin
-
-# frontend path
-REACT_APP_DIR = os.path.join(BASE_DIR, 'frontend')
 STATICFILES_DIRS = [
-    os.path.join(REACT_APP_DIR, 'build', 'static'),
+    Fronted_Path,
+    os.path.join(Fronted_Path, 'static'),
 ]
-
-# media path
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
