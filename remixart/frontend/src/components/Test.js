@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { Button, Badge } from "reactstrap";
+import { Button, Badge, Jumbotron } from "reactstrap";
 
 class Test extends Component {
   constructor(props) {
@@ -17,13 +17,15 @@ class Test extends Component {
   render() {
     return (
       <div>
-        <Badge color="secondary">
-          <h1>{this.state.user}'s App</h1>
-        </Badge>
-        <br />
-        <Button color="info" onClick={() => this.changeUser()}>
-          Alter
-        </Button>
+        <Jumbotron>
+          <Badge color="secondary">
+            <h1>{this.state.user}'s App</h1>
+          </Badge>
+          <br />
+          <Button color="info" onClick={() => this.changeUser()}>
+            Alter
+          </Button>
+        </Jumbotron>
       </div>
     );
   }
