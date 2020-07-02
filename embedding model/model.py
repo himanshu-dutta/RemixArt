@@ -37,7 +37,7 @@ class WordEmbeddingModel():
                 workers=self.args['workers'],
                 sg=self.args['sg'],
             )
-            self.build = True
+            self.built = True
         else:
             print('model alreay built')
 
