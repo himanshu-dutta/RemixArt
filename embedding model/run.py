@@ -1,7 +1,10 @@
 import argparse
 import pickle
+import time
+from data import TextDataset, load_data
 
 if __name__ == '__main__':
+    time = time.time()
     parser = argparse.ArgumentParser('Character Embedding Training')
     parser.add_argument('--vocab',
                         type=str,
@@ -13,5 +16,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    with open('config.p', 'wb') as file:
+    with open('config'+time+'.p', 'wb') as file:
         pickle.dump(args, file)
