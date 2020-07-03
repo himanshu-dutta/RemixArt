@@ -22,7 +22,7 @@ class WordEmbeddingModel():
         self.trained = False
         self.data = False
         self.sw = set(list(stopwords.words('english')) +
-                      re.split('', "!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"))
+                      re.split('', r"!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"))
         print('embedding model initialized with parameters:\n', args)
 
     def build(self):
