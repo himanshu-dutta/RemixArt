@@ -12,14 +12,14 @@ _Generating Album Art using 3 channels of input, Audio, Images and Text._
 
 # Himanshu's:
 
-- [X]Model Selection and Learning to Apply It
-- [X]Pytorch
-- []Applying the model in Pytorch
-- []Figuring Out How to Actually Transfer the Workflow to GCloud
+- [x]Model Selection and Learning to Apply It
+- [x]Pytorch
+- [ ]Applying the model in Pytorch
+- [ ]Figuring Out How to Actually Transfer the Workflow to GCloud
 
 # Archita's:
 
-- [X]Data Scrapping and Collection
-- [X]Deciding on the Data Source
-- []Storage and Retrival for efficinet processing, locally or over cloud buckets.
-- []Choice of Databse that would work well with the project.
+- [x]Data Scrapping and Collection
+- [x]Deciding on the Data Source
+- [ ]Storage and Retrival for efficinet processing, locally or over cloud buckets.
+- [ ]Choice of Databse that would work well with the project.
