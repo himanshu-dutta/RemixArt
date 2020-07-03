@@ -1,1 +1,0 @@
-gcloud compute --project remixart ssh meet_himanshu_dutta@data-collectioin --zone asia-southeast1-a
