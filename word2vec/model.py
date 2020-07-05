@@ -1,3 +1,6 @@
+import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
 
 from nltk.corpus import stopwords
 import os
@@ -8,7 +11,7 @@ from gensim.models import Word2Vec
 import nltk
 import pickle
 import time
-# nltk.download('stopwords')
+
 
 
 class WordEmbeddingModel():
@@ -41,7 +44,7 @@ class WordEmbeddingModel():
             self.model.build_vocab(self.texts)
             self.model.train(self.texts,
                              total_examples=len(self.texts),
-                             epochs=5)
+                             epochs=self.args['epochs'])
             self.built = True
         else:
             print('model alreay built')
@@ -90,7 +93,7 @@ class WordEmbeddingModel():
 
     def embedd(self, sentence):
         if self.build:
-            self.__train(self.preprocess(sentence), self.args['epochs'])
+            self.__train(self.preprocess(sentence))
             embedding = self.model.wv[self.preprocess(sentence)]
             if len(embedding) > self.args['embedding_size']:
                 embedding = embedding[:self.args['embedding_size']]
