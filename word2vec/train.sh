@@ -1,0 +1,1 @@
+python3 train.py --data_path training --save_model model --save_embedding model/embeddings.npy
