@@ -1,1 +1,1 @@
-python3 train.py --data_path ../../data/text --save_model ../models/text --save_embedding ../../data/embeddings/text_embeddings.p
+python3 train.py --data_path ../../data/text --save_model ../../data/models/text --save_embedding ../../data/embeddings/text_embeddings.p
