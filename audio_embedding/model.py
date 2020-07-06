@@ -7,11 +7,13 @@ import numpy as np
 import os
 from nltk.corpus import stopwords
 import nltk
+import ast
+import pandas as pd
 nltk.download('stopwords')
 nltk.download('punkt')
 
 
-class WordEmbeddingModel():
+class AudioEmbeddingModel():
 
     def __init__(self, args):
         '''
@@ -22,8 +24,6 @@ class WordEmbeddingModel():
         self.args = args
         self.trained = False
         self.data = False
-        self.sw = set(list(stopwords.words('english')) +
-                      re.split('', r"!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"))
         print('embedding model initialized with parameters:\n', args)
 
     def build(self):
@@ -66,12 +66,10 @@ class WordEmbeddingModel():
         texts = []
         labels = []
         print(f'loading data from {path}...')
-        for text in (os.listdir(path)):
-            with open(os.path.join(path, text), 'r') as file:
-                texts.append(
-                    self.preprocess(str(file.read()))
-                )
-                labels.append(text.split('.')[0])
+        df = pd.read_csv(path)
+        texts = df['notes'].to_list()
+        texts = [ast.literal_eval(str(text)) for text in texts]
+        labels = df['id'].to_list()
         self.texts = texts
         self.labels = labels
         self.data = True
@@ -90,8 +88,8 @@ class WordEmbeddingModel():
 
     def embedd(self, sentence):
         if self.build:
-            self.__train(self.preprocess(sentence))
-            embedding = self.model.wv[self.preprocess(sentence)]
+            self.__train(sentence)
+            embedding = self.model.wv[sentence]
             if len(embedding) > self.args['embedding_size']:
                 embedding = embedding[:self.args['embedding_size']]
             elif 0 < len(embedding) < self.args['embedding_size']:
@@ -105,16 +103,8 @@ class WordEmbeddingModel():
             print("Build the model first.")
 
     def save_embeddings(self, path):
-        embeddings = list(map(self.embedd, [' '.join(x) for x in self.texts]))
+        embeddings = list(map(self.embedd, self.texts))
         print(f'saving embeddings to {path}')
         with open(path, 'wb') as file:
             pickle.dump((embeddings, self.labels), file)
         return embeddings
-
-    def preprocess(self, text):
-        text = text.lower()
-        text = re.sub('[^a-zA-Z0-9]', ' ', text)
-        text = re.sub(r'\s+', ' ', text)
-        word_token = nltk.word_tokenize(text)
-        word_token = [word for word in word_token if word not in self.sw]
-        return word_token
