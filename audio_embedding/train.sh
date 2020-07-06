@@ -1,0 +1,1 @@
+python3 train.py --data_path ../../data/audio_vector.csv --save_model ../models/audio --save_embedding ../../data/embeddings/audio_embeddings.p
