@@ -1,9 +1,11 @@
 import os
+import random
+import torch
 import numpy as np
 import pickle as p
 import pandas as pd
 from PIL import Image
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 
 ############################
@@ -25,7 +27,7 @@ def save(obj, path):
 ############################
 
 
-class Training():
+def train():
     pass
 
 
@@ -33,11 +35,19 @@ def predict():
     pass
 
 
+def save_model():
+    pass
+
+
+def load_model():
+    pass
+
 ############################
 # Data Utility
 ############################
 
-class DataSet(DataLoader):
+
+class DataSet(Dataset):
 
     def __init__(self):
         self.folds = args['DATAFOLDS']
@@ -51,6 +61,10 @@ class DataSet(DataLoader):
         ])
         self.__load_embeddings(args['DATA_DIR'])
         self.__load_images(args['IMG_DIR'])
+        print(len(self.text_embedding) * self.folds)
+
+    def __len__(self):
+        return len(self.text_embedding) * self.folds
 
     def __load_embeddings(self, path):
         self.text_embedding, self.text_labels = load(
@@ -58,6 +72,7 @@ class DataSet(DataLoader):
         self.text_embedding, self.audio_labels = load(
             os.path.join(path, 'text_embeddings.p'))
         self.mapping = pd.read_csv(os.path.join(path, 'mapping.csv'))
+        self.mapping['id'] = self.mapping['id'].apply(str)  # .set_index('id')
 
     def __load_images(self, path):
         classes = os.listdir(path)
@@ -70,4 +85,33 @@ class DataSet(DataLoader):
         img = Image.open(path)
         return self.transform(img)
 
-    # def __getitem__(self, index):
+    def __getitem__(self, idx):
+        '''
+            for every embedding it returns 40% mismatched data
+            and 60% matching data
+        '''
+        neg = False
+        if idx % self.folds / self.folds >= 0.6:
+            neg = True
+        idx = idx // self.folds
+
+        text = torch.tensor(self.text_embedding[idx])
+        audio = torch.tensor(self.text_embedding[idx])
+
+        id = self.text_labels[idx]
+        genre = list(self.mapping[self.mapping['id'] == id].genre)[0].lower()
+        genre_idx = self.label_map[genre]
+
+        if neg:
+            cls = random.choice(
+                [i for i in range(len(self.label_map)) if i != genre_idx])
+            img_idx = random.choice(range(len(self.images[cls])))
+            label = 0
+        else:
+            cls = genre_idx
+            img_idx = random.choice(range(len(self.images[cls])))
+            label = 1
+
+        img = self.__process_image(self.images[cls][img_idx])
+
+        return text, audio, img, label

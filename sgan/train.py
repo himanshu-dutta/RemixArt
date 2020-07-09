@@ -25,6 +25,9 @@ if __name__ == '__main__':
     parser.add_argument('--IMGSIZE1', type=int, default=64)
     parser.add_argument('--IMGSIZE2', type=int, default=256)
 
+    # logging
+    parser.add_argument('--log_dir', type=str)
+
     # model architecture definitions
     parser.add_argument('--EMBEDDDIM', type=tuple, default=(100, 200))
     parser.add_argument('--DIMENSION', type=int, default=1024)
