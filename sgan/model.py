@@ -31,7 +31,7 @@ def weights_init(m):
 
 
 class T2O(nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         '''
             The word embeddings from the Word2Vec Model are of a 
             constant dimension, 100x200. This class is to convert 
@@ -56,7 +56,7 @@ class T2O(nn.Module):
 
 
 class CA_NET(nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         super(CA_NET, self).__init__()
         self.t_dim = args['DIMENSION']
         self.c_dim = args['CONDITION_DIM']
@@ -103,11 +103,12 @@ def upBlock(in_planes, out_planes):
 
 
 class STAGE1_G(nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         super(STAGE1_G, self).__init__()
         self.gf_dim = args['GF_DIM'] * 8
         self.ef_dim = args['CONDITION_DIM'] * 2
         self.z_dim = args['Z_DIM']
+        self.args = args
         self.define_module()
 
     def define_module(self):
@@ -115,9 +116,9 @@ class STAGE1_G(nn.Module):
         ninput = self.z_dim + self.ef_dim
         ngf = self.gf_dim
         # extracts a vector of 1D from 2D
-        self.t2o = T2O()
+        self.t2o = T2O(self.args)
         # conditional aug network
-        self.ca_net = CA_NET()
+        self.ca_net = CA_NET(self.args)
         # ngf x 4 x 4
         self.fc = nn.Sequential(
             nn.Linear(ninput, ngf * 4 * 4, bias=False),
@@ -179,15 +180,17 @@ class STAGE1_G(nn.Module):
 
 
 class STAGE1_D(nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         super(STAGE1_D, self).__init__()
         self.df_dim = args['DF_DIM']
         self.ef_dim = args['CONDITION_DIM']
+        self.args = args
         self.define_module()
 
     def define_module(self):
 
-        ndf = self.df_dim
+        ndf, nef = self.df_dim, self.ef_dim
+
         self.encode_img = nn.Sequential(
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
@@ -205,18 +208,28 @@ class STAGE1_D(nn.Module):
             # state size (ndf * 8) x 4 x 4)
             nn.LeakyReLU(0.2, inplace=True)
         )
+        self.outlogits = nn.Sequential(
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
+            nn.Flatten(),
+            nn.Sigmoid())
         # self.get_cond_logits = D_GET_LOGITS(ndf, nef)
         # self.get_uncond_logits = None
 
     def forward(self, image):
         self.encode_img.train()
+        self.outlogits.train()
         img_embedding = self.encode_img(image)
-        return img_embedding
+        img = self.outlogits(img_embedding)
+        return img
 
     def eval(self, image):
         self.encode_img.eval()
+        self.outlogits.eval()
         img_embedding = self.encode_img(image)
-        return img_embedding
+        img = self.outlogits(img_embedding)
+        return img
 
 ########################################################
 # STAGE 2:
@@ -243,11 +256,12 @@ class ResBlock(nn.Module):
 
 
 class STAGE2_G(nn.Module):
-    def __init__(self, STAGE1_G):
+    def __init__(self, STAGE1_G, args):
         super(STAGE2_G, self).__init__()
         self.gf_dim = args['GF_DIM']
         self.ef_dim = args['CONDITION_DIM']*2
         self.z_dim = args['Z_DIM']
+        self.args = args
         self.STAGE1_G = STAGE1_G
         # fix parameters of stageI GAN
         for param in self.STAGE1_G.parameters():
@@ -256,16 +270,16 @@ class STAGE2_G(nn.Module):
 
     def _make_layer(self, block, channel_num):
         layers = []
-        for i in range(args['R_NUM']):
+        for i in range(self.args['R_NUM']):
             layers.append(block(channel_num))
         return nn.Sequential(*layers)
 
     def define_module(self):
         ngf = self.gf_dim
         # extracts a vector of 1D from 2D
-        self.t2o = T2O()
+        self.t2o = T2O(self.args)
         # conditional aug network
-        self.ca_net = CA_NET()
+        self.ca_net = CA_NET(self.args)
         # --> 4ngf x 16 x 16
         self.encoder = nn.Sequential(
             conv3x3(3, ngf),
@@ -354,14 +368,15 @@ class STAGE2_G(nn.Module):
 
 
 class STAGE2_D(nn.Module):
-    def __init__(self):
+    def __init__(self, args):
         super(STAGE2_D, self).__init__()
         self.df_dim = args['DF_DIM']
         self.ef_dim = args['CONDITION_DIM'] * 2
+        self.args = args
         self.define_module()
 
     def define_module(self):
-        ndf = self.df_dim
+        ndf, nef = self.df_dim, self.ef_dim
         self.encode_img = nn.Sequential(
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),  # 128 * 128 * ndf
             nn.LeakyReLU(0.2, inplace=True),
@@ -387,18 +402,28 @@ class STAGE2_D(nn.Module):
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True)   # 4 * 4 * ndf * 8
         )
+        self.outlogits = nn.Sequential(
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
+            nn.Flatten(),
+            nn.Sigmoid())
 
         # self.get_cond_logits = D_GET_LOGITS(ndf, nef, bcondition=True)
         # self.get_uncond_logits = D_GET_LOGITS(ndf, nef, bcondition=False)
 
     def forward(self, image):
         self.encode_img.train()
-        img_embedding = self.encode_img(image)
+        self.outlogits.train()
 
-        return img_embedding
+        img_embedding = self.encode_img(image)
+        img = self.outlogits(img_embedding)
+        return img
 
     def eval(self, image):
         self.encode_img.eval()
-        img_embedding = self.encode_img(image)
+        self.outlogits.eval()
 
-        return img_embedding
+        img_embedding = self.encode_img(image)
+        img = self.outlogits(img_embedding)
+        return img

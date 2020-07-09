@@ -1,0 +1,7 @@
+// This file contains path to the saved models
+{
+  "gen1": "None",
+  "dis1": "None",
+  "gen2": "None",
+  "dis2": "None"
+}

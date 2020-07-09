@@ -1,7 +1,15 @@
+import torch
 import argparse
 import sys
 sys.path.append('.')
 
+
+if torch.cuda.is_available():
+      device = torch.device('cuda:0')
+  print('running on gpu...')
+else:
+  device = torch.device('cpu')
+  print('running on gpu...')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('SGAN Model Training')
@@ -9,7 +17,7 @@ if __name__ == '__main__':
     # data parameters
     parser.add_argument('--DATA_DIR', type=str)
     parser.add_argument('--IMG_DIR', type=str)
-    parser.add_argument('--STAGE1_G', type=str)
+    parser.add_argument('--STAGE1_G', type=str, default=None)
     parser.add_argument('--DATAFOLDS', type=int)
 
     # run parameters
