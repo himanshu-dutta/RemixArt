@@ -3,6 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+############################
+# Weight Initialization
+# for initializing weights
+# from normal dist
+############################
+
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -14,6 +21,13 @@ def weights_init(m):
         m.weight.data.normal_(0.0, 0.02)
         if m.bias is not None:
             m.bias.data.fill_(0.0)
+
+########################################################
+# Helper Models:
+# 1. T2O converts 2D embedding representation to 1D
+# 2. CA_NET is the model used for Conditionally
+# Augmenting both text and audio embedding together
+########################################################
 
 
 class T2O(nn.Module):
@@ -67,6 +81,10 @@ class CA_NET(nn.Module):
         return c_code, mu, logvar
 
 
+########################################################
+# STAGE 1:
+########################################################
+
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
@@ -101,9 +119,11 @@ class STAGE1_G(nn.Module):
         # conditional aug network
         self.ca_net = CA_NET()
         # ngf x 4 x 4
-        self.fc = nn.Linear(ninput, ngf * 4 * 4, bias=False)
-        self.bn = nn.BatchNorm1d(ngf * 4 * 4)
-        self.relu = nn.ReLU(True)
+        self.fc = nn.Sequential(
+            nn.Linear(ninput, ngf * 4 * 4, bias=False),
+            nn.BatchNorm1d(ngf * 4 * 4),
+            nn.ReLU(True),
+        )
         # ngf x 4 x 4 -> ngf/2 x 8 x 8
         self.upsample1 = upBlock(ngf, ngf // 2)
         # ngf/4 x 16 x 16
@@ -118,6 +138,7 @@ class STAGE1_G(nn.Module):
             nn.Tanh())
 
     def forward(self, text_embedding, audio_embedding, noise):
+        self.fc.train()
         # 2d to 1d vector
         t_e = self.t2o(text_embedding)
         a_e = self.t2o(audio_embedding)
@@ -126,9 +147,26 @@ class STAGE1_G(nn.Module):
         z_c_code = torch.cat((noise, c_code), 1)
         # linear and upsampling layers
         h_code = self.fc(z_c_code)
-        if z_c_code.shape[0] > 1:
-            h_code = self.bn(h_code)
-        h_code = self.relu(h_code)
+        h_code = h_code.view(-1, self.gf_dim, 4, 4)
+        h_code = self.upsample1(h_code)
+        h_code = self.upsample2(h_code)
+        h_code = self.upsample3(h_code)
+        h_code = self.upsample4(h_code)
+        # state size 3 x 64 x 64
+        # image generation
+        fake_img = self.img(h_code)
+        return None, fake_img, mu, logvar
+
+    def eval(self, text_embedding, audio_embedding, noise):
+        self.fc.eval()
+        # 2d to 1d vector
+        t_e = self.t2o(text_embedding)
+        a_e = self.t2o(audio_embedding)
+        # conditional augmentation
+        c_code, mu, logvar = self.ca_net(t_e, a_e)
+        z_c_code = torch.cat((noise, c_code), 1)
+        # linear and upsampling layers
+        h_code = self.fc(z_c_code)
         h_code = h_code.view(-1, self.gf_dim, 4, 4)
         h_code = self.upsample1(h_code)
         h_code = self.upsample2(h_code)
@@ -171,8 +209,18 @@ class STAGE1_D(nn.Module):
         # self.get_uncond_logits = None
 
     def forward(self, image):
+        self.encode_img.train()
         img_embedding = self.encode_img(image)
         return img_embedding
+
+    def eval(self, image):
+        self.encode_img.eval()
+        img_embedding = self.encode_img(image)
+        return img_embedding
+
+########################################################
+# STAGE 2:
+########################################################
 
 
 class ResBlock(nn.Module):
@@ -247,7 +295,40 @@ class STAGE2_G(nn.Module):
             nn.Tanh())
 
     def forward(self, text_embedding, audio_embedding, noise):
+        # setting all the sequential models to training
+        self.encoder.train()
+        self.hr_joint.train()
+        self.residual.train()
         _, stage1_img, _, _ = self.STAGE1_G(
+            text_embedding, audio_embedding, noise)
+        stage1_img = stage1_img.detach()
+        encoded_img = self.encoder(stage1_img)
+
+        # 2d to 1d vector
+        t_e = self.t2o(text_embedding)
+        a_e = self.t2o(audio_embedding)
+        # conditional augmentation
+        c_code, mu, logvar = self.ca_net(t_e, a_e)
+        c_code = c_code.view(-1, self.ef_dim, 1, 1)
+        c_code = c_code.repeat(1, 1, 16, 16)
+        i_c_code = torch.cat([encoded_img, c_code], 1)
+        h_code = self.hr_joint(i_c_code)
+        h_code = self.residual(h_code)
+
+        h_code = self.upsample1(h_code)
+        h_code = self.upsample2(h_code)
+        h_code = self.upsample3(h_code)
+        h_code = self.upsample4(h_code)
+
+        fake_img = self.img(h_code)
+        return stage1_img, fake_img, mu, logvar
+
+    def eval(self, text_embedding, audio_embedding, noise):
+        # setting all the sequential models to evaluation
+        self.encoder.eval()
+        self.hr_joint.eval()
+        self.residual.eval()
+        _, stage1_img, _, _ = self.STAGE1_G.eval(
             text_embedding, audio_embedding, noise)
         stage1_img = stage1_img.detach()
         encoded_img = self.encoder(stage1_img)
@@ -311,6 +392,13 @@ class STAGE2_D(nn.Module):
         # self.get_uncond_logits = D_GET_LOGITS(ndf, nef, bcondition=False)
 
     def forward(self, image):
+        self.encode_img.train()
+        img_embedding = self.encode_img(image)
+
+        return img_embedding
+
+    def eval(self, image):
+        self.encode_img.eval()
         img_embedding = self.encode_img(image)
 
         return img_embedding
