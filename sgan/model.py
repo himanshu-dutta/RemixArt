@@ -189,7 +189,7 @@ class STAGE1_D(nn.Module):
 
     def define_module(self):
 
-        ndf, nef = self.df_dim, self.ef_dim
+        ndf = self.df_dim
 
         self.encode_img = nn.Sequential(
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),
@@ -376,7 +376,7 @@ class STAGE2_D(nn.Module):
         self.define_module()
 
     def define_module(self):
-        ndf, nef = self.df_dim, self.ef_dim
+        ndf = self.df_dim
         self.encode_img = nn.Sequential(
             nn.Conv2d(3, ndf, 4, 2, 1, bias=False),  # 128 * 128 * ndf
             nn.LeakyReLU(0.2, inplace=True),
