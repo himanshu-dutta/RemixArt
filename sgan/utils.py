@@ -7,11 +7,13 @@ import pickle as p
 import pandas as pd
 from PIL import Image
 from tqdm import tqdm
-import torch.optim as optim
 import torch.nn as nn
+import torch.optim as optim
+from datetime import datetime
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
+from torch.utils.tensorboard import SummaryWriter
 
 from model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
 
@@ -51,10 +53,6 @@ def KL_Div(mu, var):
 ############################
 
 
-def log_model():
-    pass
-
-
 def load_model(args, stage=1, path=None, device=None):
     if not device:
         device = torch.device('cpu')
@@ -82,9 +80,32 @@ def load_model(args, stage=1, path=None, device=None):
     return gen, dis
 
 
-def train(dataloader, args, path=None, device=None, summary=None):
+def save_model(gen, dis, args, epochs, timestamp=None):
+    if not timestamp:
+        timestamp = datetime.now().strftime('%Y%m%d%H%M')
+    dir_ = os.path.join(args['SAVE_MODEL'], timestamp, f"stage{args['STAGE']}")
+    if not os.path.exists(dir_):
+        os.makedirs(dir_)
+    torch.save(
+        gen.state_dict(),
+        os.path.join(dir_, f"gen_{args['STAGE']}_{epochs}.pth"))
+    torch.save(
+        dis.state_dict(),
+        os.path.join(dir_, f"dis_{args['STAGE']}_{epochs}.pth"))
+    print_styled(
+        f"Model for stage {args['STAGE']} for epoch {epochs} saved at {dir_}...")
+
+
+def train(dataloader, args, path=None, device=None, timestamp=None):
     if not device:
         device = torch.device('cpu')
+    # initializing the logger
+    if not timestamp:
+        timestamp = datetime.now().strftime('%Y%m%d%H%M')
+    writer_path = os.path.join(
+        args['LOG_DIR'], timestamp, f"stage{args['STAGE']}")
+
+    writer = SummaryWriter(writer_path)
 
     # loading the models
     epochs = args['MAX_EPOCH']
@@ -107,7 +128,7 @@ def train(dataloader, args, path=None, device=None, summary=None):
 
         for i, data in enumerate(dataloader):
 
-            print_styled(f'Currently running batch {i}')
+            print(f'Currently running batch {i}')
             # loading each batch
             text, audio, image = data
             text, audio, image = text.to(device), audio.to(device),\
@@ -119,6 +140,10 @@ def train(dataloader, args, path=None, device=None, summary=None):
             # generating labels for data
             zeros = torch.zeros(int(BATCHSIZE), 1).to(device)
             ones = torch.ones(int(BATCHSIZE), 1).to(device)
+
+            # # logging the model
+            # if epoch == 0 and i == 0:
+            #     writer.add_graph(gen, (text, audio, noise))
 
             # generating discriminator data
 
@@ -155,22 +180,35 @@ def train(dataloader, args, path=None, device=None, summary=None):
 
             G_loss_run += G_loss.item()
             D_loss_run += D_loss.item()
+            if i % args['DATAFOLDS'] == 0:
+                writer.add_scalar('D_loss', D_loss.flatten()[0])
+                writer.add_scalar('D_real_loss', D_real_loss.flatten()[0])
+                writer.add_scalar('D_fake_loss', D_fake_loss.flatten()[0])
+                writer.add_scalar('G_loss', G_loss.flatten()[0])
+                writer.add_scalar('G_loss_fake', G_loss_fake.flatten()[0])
+                writer.add_scalar('KL_loss', KL_loss.flatten()[0])
 
-            print_styled(
-                f'Current Loss Gen:{G_loss.item()} Dis:{D_loss.item()}')
+        if epoch % args['SNAPSHOT_INTERVAL'] == 0:
+            save_model(gen, dis, args, epoch, timestamp)
         # printing loss after each epoch
-        print('Epoch:{},   G_loss:{},   D_loss:{}'.format(
+        print_styled('Epoch:{},   G_loss:{},   D_loss:{}'.format(
             epoch, G_loss_run/(i+1), D_loss_run/(i+1)))
-    print_styled('Model training took {(time.time()-start)/60} mins.')
+    save_model(gen, dis, args, epoch, timestamp)
+    print_styled(f'Model training took {(time.time()-start)/60} mins.')
+    writer.close()
     return gen, dis
 
 
-def predict():
-    pass
-
-
-def save_model():
-    pass
+def predict(text, audio, args, path, stage, device=None):
+    if not device:
+        device = torch.device('cpu')
+    gen, _ = load_model(args, stage, path, device)
+    noise = torch.randn(text.shape[0], args['Z_DIM']).to(device)
+    res = gen.eval(text, audio, noise).detach().numpy()
+    if len(res.shape) == 4:
+        return np.moveaxis(res, 1, 3)
+    elif len(res.shape) == 3:
+        return np.moveaxis(res, 0, 2)
 
 
 ############################
