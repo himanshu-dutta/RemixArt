@@ -31,8 +31,8 @@ def save(obj, path):
 
 
 def print_styled(text):
-    hf = '#' * len(text) + '#' * 5 + '\n'
-    sent = '#   ' + text + '\n'
+    hf = '\n'+'#' * len(text) + '#' * 5 + '\n'
+    sent = '#   ' + text
     print(hf + sent + hf)
 
 
@@ -46,18 +46,13 @@ def KL_Div(mu, var):
     KLD = torch.mean(KLD).mul_(-0.5)
     return KLD
 
-
-def G_Loss(g):
-    pass
-
-
-def D_Loss(d):
-    pass
-
-
 ############################
 # Model Utility
 ############################
+
+
+def log_model():
+    pass
 
 
 def load_model(args, stage=1, path=None, device=None):
@@ -112,39 +107,30 @@ def train(dataloader, args, path=None, device=None, summary=None):
 
         for i, data in enumerate(dataloader):
 
+            print_styled(f'Currently running batch {i}')
             # loading each batch
-            text, audio, image, label = data
-            text, audio, image, label = text.to(device), audio.to(device),\
-                image.to(device), label.to(device)
+            text, audio, image = data
+            text, audio, image = text.to(device), audio.to(device),\
+                image.to(device)
             BATCHSIZE = text.shape[0]
 
-            # segregating mismatched and real
-            mis = (label == 0).nonzero().flatten()
-            real = (label != 0).nonzero().flatten()
+            noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
 
-            image_r, label_r = image[real], label[real]
-            text_m, audio_m, image_m, label_m = text[mis], audio[mis], image[mis], label[mis]
-            noise_m = torch.randn(len(label_m), args['Z_DIM']).to(device)
-
-            # generating labels for fake data
-            label_f = torch.zeros(int(BATCHSIZE*0.5), 1).to(device)
-            label_t = torch.ones(int(BATCHSIZE*0.5), 1).to(device)
-
-            # generating random noise from stdnormal dist
-            noise = torch.randn(int(BATCHSIZE*0.5), args['Z_DIM']).to(device)
+            # generating labels for data
+            zeros = torch.zeros(int(BATCHSIZE), 1).to(device)
+            ones = torch.ones(int(BATCHSIZE), 1).to(device)
 
             # generating discriminator data
-            D_real = dis(image_r)
-            D_mis = dis(gen(text_m, audio_m, noise_m))
-            D_fake = dis(gen(text[:int(BATCHSIZE*0.5)],
-                             audio[int(BATCHSIZE*0.5):], noise))
+
+            _, img_f, _, _ = gen(text, audio, noise)
+            D_real = dis(image.detach())
+            D_fake = dis(img_f.detach())
 
             # calculating discriminator loss
-            D_real_loss = F.binary_cross_entropy(D_real, label_r.view(-1, 1))
-            D_mis_loss = F.binary_cross_entroy(D_mis, label_m.view(-1, 1))
-            D_fake_loss = F.binary_cross_entropy(D_fake, label_f.view(-1, 1))
+            D_real_loss = F.binary_cross_entropy(D_real, ones.view(-1, 1))
+            D_fake_loss = F.binary_cross_entropy(D_fake, zeros.view(-1, 1))
 
-            D_loss = D_real_loss + D_mis_loss + D_fake_loss
+            D_loss = D_real_loss + D_fake_loss
 
             # backprop for discriminator network
             dis_optim.zero_grad()
@@ -152,26 +138,31 @@ def train(dataloader, args, path=None, device=None, summary=None):
             dis_optim.step()
 
             # feed-forward for generator
-
-            noise = torch.randn(int(BATCHSIZE*1.5), args['Z_DIM']).to(device)
-
-            D_fake = dis(gen(text[:int(BATCHSIZE*0.5)],
-                             audio[int(BATCHSIZE*0.5):], noise))
+            noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
+            _, img_f, mu_f, logvar_f = gen(text,
+                                           audio, noise)
+            D_fake = dis(img_f)
 
             # calculating generator loss
-            G_loss = F.binary_cross_entropy(D_fake, label_t)
+            KL_loss = KL_Div(mu_f, logvar_f)
+            G_loss_fake = F.binary_cross_entropy(D_fake, ones)
+            G_loss = KL_loss + G_loss_fake
 
             # backprop for generator network
-            g_optim.zero_grad()
+            gen_optim.zero_grad()
             G_loss.backward()
-            g_optim.step()
+            gen_optim.step()
 
             G_loss_run += G_loss.item()
             D_loss_run += D_loss.item()
 
+            print_styled(
+                f'Current Loss Gen:{G_loss.item()} Dis:{D_loss.item()}')
         # printing loss after each epoch
         print('Epoch:{},   G_loss:{},   D_loss:{}'.format(
             epoch, G_loss_run/(i+1), D_loss_run/(i+1)))
+    print_styled('Model training took {(time.time()-start)/60} mins.')
+    return gen, dis
 
 
 def predict():
@@ -189,7 +180,7 @@ def save_model():
 
 class DataSet(Dataset):
 
-    def __init__(self):
+    def __init__(self, args):
         self.folds = args['DATAFOLDS']
         if args['STAGE'] == 1:
             self.imgdim = args['IMGSIZE1']
@@ -245,12 +236,10 @@ class DataSet(Dataset):
             cls = random.choice(
                 [i for i in range(len(self.label_map)) if i != genre_idx])
             img_idx = random.choice(range(len(self.images[cls])))
-            label = torch.tensor(0)
         else:
             cls = genre_idx
             img_idx = random.choice(range(len(self.images[cls])))
-            label = torch.tensor(1)
 
         img = self.__process_image(self.images[cls][img_idx])
 
-        return text, audio, img, label
+        return text.type(torch.float32), audio.type(torch.float32), img.type(torch.float32)
