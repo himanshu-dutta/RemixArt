@@ -4,3 +4,4 @@ audio_embedding/nb/
 word2vec/nb/
 data/nb/
 sgan/model/
+sgan/logs/
