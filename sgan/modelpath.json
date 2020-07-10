@@ -1,7 +1,6 @@
-// This file contains path to the saved models
 {
-  "gen1": "None",
-  "dis1": "None",
-  "gen2": "None",
-  "dis2": "None"
+  "gen1": "model/gen_1_10.pth",
+  "dis1": "model/dis_1_10.pth",
+  "gen2": "",
+  "dis2": ""
 }
