@@ -43,10 +43,10 @@ def print_styled(text):
 ############################
 
 
-def KL_Div(mu, var):
+def KL_Div(mu, var, fact):
     KLD = mu.pow(2).add_(var.exp()).mul_(-1).add_(1).add_(var)
     KLD = torch.mean(KLD).mul_(-0.5)
-    return KLD
+    return KLD*fact
 
 ############################
 # Model Utility
@@ -55,7 +55,7 @@ def KL_Div(mu, var):
 
 def load_model(args, stage=1, path=None, device=None):
     if not device:
-        device = torch.device('cpu')
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if stage == 1:
         gen = STAGE1_G(args).to(device)
@@ -96,9 +96,9 @@ def save_model(gen, dis, args, epochs, timestamp=None):
         f"Model for stage {args['STAGE']} for epoch {epochs} saved at {dir_}...")
 
 
-def train(dataloader, args, path=None, device=None, timestamp=None):
+def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2):
     if not device:
-        device = torch.device('cpu')
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # initializing the logger
     if not timestamp:
         timestamp = datetime.now().strftime('%Y%m%d%H%M')
@@ -115,8 +115,13 @@ def train(dataloader, args, path=None, device=None, timestamp=None):
     start = time.time()
 
     # optimizer and loss
+    gen_para = []
+    for p in gen.parameters():
+        if p.requires_grad:
+            gen_para.append(p)
+
     gen_optim = optim.Adam(
-        gen.parameters(), lr=args['GENERATOR_LR'], betas=(0.5, 0.999))
+        gen_para, lr=args['GENERATOR_LR'], betas=(0.5, 0.999))
     dis_optim = optim.Adam(
         dis.parameters(), lr=args['DISCRIMINATOR_LR'], betas=(0.5, 0.999))
 
@@ -147,7 +152,7 @@ def train(dataloader, args, path=None, device=None, timestamp=None):
 
             # generating discriminator data
 
-            _, img_f, _, _ = gen(text, audio, noise)
+            _, img_f, mu_f, logvar_f = gen(text, audio, noise)
             D_real = dis(image.detach())
             D_fake = dis(img_f.detach())
 
@@ -163,15 +168,12 @@ def train(dataloader, args, path=None, device=None, timestamp=None):
             dis_optim.step()
 
             # feed-forward for generator
-            noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
-            _, img_f, mu_f, logvar_f = gen(text,
-                                           audio, noise)
             D_fake = dis(img_f)
 
             # calculating generator loss
-            KL_loss = KL_Div(mu_f, logvar_f)
+            KL_loss = KL_Div(mu_f, logvar_f, KL_factor)
             G_loss_fake = F.binary_cross_entropy(D_fake, ones)
-            G_loss = KL_loss + G_loss_fake
+            G_loss = G_loss_fake + KL_loss
 
             # backprop for generator network
             gen_optim.zero_grad()
@@ -181,12 +183,18 @@ def train(dataloader, args, path=None, device=None, timestamp=None):
             G_loss_run += G_loss.item()
             D_loss_run += D_loss.item()
             if i % args['DATAFOLDS'] == 0:
-                writer.add_scalar('D_loss', D_loss.flatten()[0])
-                writer.add_scalar('D_real_loss', D_real_loss.flatten()[0])
-                writer.add_scalar('D_fake_loss', D_fake_loss.flatten()[0])
-                writer.add_scalar('G_loss', G_loss.flatten()[0])
-                writer.add_scalar('G_loss_fake', G_loss_fake.flatten()[0])
-                writer.add_scalar('KL_loss', KL_loss.flatten()[0])
+                writer.add_scalar('D_loss', D_loss.flatten()
+                                  [0], epoch*BATCHSIZE+i)
+                writer.add_scalar('D_real_loss', D_real_loss.flatten()[
+                                  0], epoch*BATCHSIZE+i)
+                writer.add_scalar('D_fake_loss', D_fake_loss.flatten()[
+                                  0], epoch*BATCHSIZE+i)
+                writer.add_scalar('G_loss', G_loss.flatten()
+                                  [0], epoch*BATCHSIZE+i)
+                writer.add_scalar('G_loss_fake', G_loss_fake.flatten()[
+                                  0], epoch*BATCHSIZE+i)
+                writer.add_scalar('KL_loss', KL_loss.flatten()[
+                                  0], epoch*BATCHSIZE+i)
 
         if epoch % args['SNAPSHOT_INTERVAL'] == 0:
             save_model(gen, dis, args, epoch, timestamp)
@@ -201,7 +209,7 @@ def train(dataloader, args, path=None, device=None, timestamp=None):
 
 def predict(text, audio, args, path, stage, device=None):
     if not device:
-        device = torch.device('cpu')
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     gen, _ = load_model(args, stage, path, device)
     noise = torch.randn(text.shape[0], args['Z_DIM']).to(device)
     res = gen.eval(text, audio, noise).detach().numpy()

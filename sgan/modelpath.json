@@ -1,6 +1,6 @@
 {
-  "gen1": "model/gen_1_10.pth",
-  "dis1": "model/dis_1_10.pth",
+  "gen1": "model/202007132220/stage1/gen_1_29.pth",
+  "dis1": "model/202007132220/stage1/dis_1_29.pth",
   "gen2": "",
   "dis2": ""
 }

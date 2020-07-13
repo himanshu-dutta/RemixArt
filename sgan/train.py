@@ -5,11 +5,11 @@ sys.path.append('.')
 
 
 if torch.cuda.is_available():
-      device = torch.device('cuda:0')
-  print('running on gpu...')
+    device = torch.device('cuda:0')
+    print('running on gpu...')
 else:
-  device = torch.device('cpu')
-  print('running on gpu...')
+    device = torch.device('cpu')
+    print('running on cpu...')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('SGAN Model Training')
