@@ -151,7 +151,7 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             #     writer.add_graph(gen, (text, audio, noise))
 
             # generating discriminator data
-
+            print(f'Currently running batch {i}')
             _, img_f, mu_f, logvar_f = gen(text, audio, noise)
             D_real = dis(image.detach())
             D_fake = dis(img_f.detach())
