@@ -245,8 +245,8 @@ class DataSet(Dataset):
     def __load_embeddings(self, path):
         self.text_embedding, self.text_labels = load(
             os.path.join(path, 'text_embeddings.p'))
-        self.text_embedding, self.audio_labels = load(
-            os.path.join(path, 'text_embeddings.p'))
+        self.audio_embedding, self.audio_labels = load(
+            os.path.join(path, 'audio_embeddings.p'))
         self.mapping = pd.read_csv(os.path.join(path, 'mapping.csv'))
         self.mapping['id'] = self.mapping['id'].apply(str)  # .set_index('id')
 
@@ -268,11 +268,11 @@ class DataSet(Dataset):
         '''
         neg = False
         if idx % self.folds / self.folds >= 0.5:
-            neg = True
+            neg = False
         idx = idx // self.folds
 
         text = torch.tensor(self.text_embedding[idx])
-        audio = torch.tensor(self.text_embedding[idx])
+        audio = torch.tensor(self.audio_embedding[idx])
 
         id = self.text_labels[idx]
         genre = list(self.mapping[self.mapping['id'] == id].genre)[0].lower()
