@@ -142,6 +142,7 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
 
             noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
 
+            print(f'Currently running batch {i}')
             # generating labels for data
             zeros = torch.zeros(int(BATCHSIZE), 1).to(device)
             ones = torch.ones(int(BATCHSIZE), 1).to(device)
@@ -151,7 +152,6 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             #     writer.add_graph(gen, (text, audio, noise))
 
             # generating discriminator data
-            print(f'Currently running batch {i}')
             _, img_f, mu_f, logvar_f = gen(text, audio, noise)
             D_real = dis(image.detach())
             D_fake = dis(img_f.detach())
