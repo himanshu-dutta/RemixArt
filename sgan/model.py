@@ -52,7 +52,6 @@ class T2O(nn.Module):
         )
 
     def forward(self, embedding):
-        print(embedding.device)
         return self.model(embedding)
 
 
@@ -72,10 +71,10 @@ class CA_NET(nn.Module):
         return mu, logvar
 
     def reparametrize(self, mu, logvar):
-        print(mu.device, logvar.device)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         std = logvar.mul(0.5).exp_()
         eps = torch.Tensor(std.size()).normal_()
-        if 'cuda' in self.device.type:
+        if 'cuda' in device.type:
             eps = torch.cuda.FloatTensor(std.size()).normal_()
         return eps.mul(std).add_(mu)
 
@@ -143,15 +142,11 @@ class STAGE1_G(nn.Module):
             nn.Tanh())
 
     def forward(self, text_embedding, audio_embedding, noise):
-        print('Here1')
         self.fc.train()
         # 2d to 1d vector
-        print('Here2')
         t_e = self.t2o(text_embedding)
-        print('Here3')
         a_e = self.t2o(audio_embedding)
         # conditional augmentation
-        print('Here4')
         c_code, mu, logvar = self.ca_net(t_e, a_e)
         z_c_code = torch.cat((noise, c_code), 1)
         # linear and upsampling layers

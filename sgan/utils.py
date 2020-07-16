@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from .model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
+from model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
 
 ############################
 # General Utility
@@ -134,12 +134,11 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
         for i, data in enumerate(dataloader):
 
             print(f'Currently running batch {i}')
-            print(f'Currently running batch {i}')
             # loading each batch
             text, audio, image = data
             print(f'Currently running batch {i}')
-            text, audio, image = torch.tensor(text).to(device).type(torch.float32), torch.tensor(audio).to(device).type(torch.float32),\
-                torch.tensor(image).to(device).type(torch.float32)
+            text, audio, image = text.to(device), audio.to(device),\
+                image.to(device)
             BATCHSIZE = text.shape[0]
 
             noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
@@ -267,13 +266,14 @@ class DataSet(Dataset):
             for every embedding it returns 50% mismatched data
             and 50% matching data
         '''
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         neg = False
         if idx % self.folds / self.folds >= 0.5:
             neg = False
         idx = idx // self.folds
 
-        text = (self.text_embedding[idx])
-        audio = (self.audio_embedding[idx])
+        text = torch.tensor(self.text_embedding[idx]).to(device)
+        audio = torch.tensor(self.audio_embedding[idx]).to(device)
 
         id = self.text_labels[idx]
         genre = list(self.mapping[self.mapping['id'] == id].genre)[0].lower()
@@ -289,4 +289,4 @@ class DataSet(Dataset):
 
         img = self.__process_image(self.images[cls][img_idx])
 
-        return text, audio, img
+        return text.float(), audio.float(), img.float()
