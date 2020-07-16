@@ -9,8 +9,6 @@ import torch.nn.functional as F
 # from normal dist
 ############################
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -42,8 +40,6 @@ class T2O(nn.Module):
         '''
 
         super(T2O, self).__init__()
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
         # number of channels for 1D conv.
         self.in_channels = args['EMBEDDDIM'][0]
         # Calculating the inputs for the linear layer.
@@ -53,7 +49,7 @@ class T2O(nn.Module):
             nn.Flatten(),
             nn.Linear(32*self.in_features, 1024),
             nn.ReLU()
-        ).to(self.device)
+        )
 
     def forward(self, embedding):
         print(embedding.device)
@@ -78,7 +74,9 @@ class CA_NET(nn.Module):
     def reparametrize(self, mu, logvar):
         print(mu.device, logvar.device)
         std = logvar.mul(0.5).exp_()
-        eps = torch.Tensor(std.size()).to(self.device).normal_()
+        eps = torch.Tensor(std.size()).normal_()
+        if 'cuda' in self.device.type:
+            eps = torch.cuda.FloatTensor(std.size()).normal_()
         return eps.mul(std).add_(mu)
 
     def forward(self, text_embedding, audio_embedding):
@@ -111,8 +109,6 @@ def upBlock(in_planes, out_planes):
 class STAGE1_G(nn.Module):
     def __init__(self, args):
         super(STAGE1_G, self).__init__()
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.gf_dim = args['GF_DIM'] * 8
         self.ef_dim = args['CONDITION_DIM'] * 2
         self.z_dim = args['Z_DIM']
@@ -124,15 +120,15 @@ class STAGE1_G(nn.Module):
         ninput = self.z_dim + self.ef_dim
         ngf = self.gf_dim
         # extracts a vector of 1D from 2D
-        self.t2o = T2O(self.args).to(self.device)
+        self.t2o = T2O(self.args)
         # conditional aug network
-        self.ca_net = CA_NET(self.args).to(self.device)
+        self.ca_net = CA_NET(self.args)
         # ngf x 4 x 4
         self.fc = nn.Sequential(
             nn.Linear(ninput, ngf * 4 * 4, bias=False),
             nn.BatchNorm1d(ngf * 4 * 4),
             nn.ReLU(True),
-        ).to(self.device)
+        )
         # ngf x 4 x 4 -> ngf/2 x 8 x 8
         self.upsample1 = upBlock(ngf, ngf // 2)
         # ngf/4 x 16 x 16
@@ -270,8 +266,6 @@ class ResBlock(nn.Module):
 class STAGE2_G(nn.Module):
     def __init__(self, STAGE1_G, args):
         super(STAGE2_G, self).__init__()
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
         self.gf_dim = args['GF_DIM']
         self.ef_dim = args['CONDITION_DIM']*2
         self.z_dim = args['Z_DIM']
@@ -291,9 +285,9 @@ class STAGE2_G(nn.Module):
     def define_module(self):
         ngf = self.gf_dim
         # extracts a vector of 1D from 2D
-        self.t2o = T2O(self.args).to(self.device)
+        self.t2o = T2O(self.args)
         # conditional aug network
-        self.ca_net = CA_NET(self.args).to(self.device)
+        self.ca_net = CA_NET(self.args)
         # --> 4ngf x 16 x 16
         self.encoder = nn.Sequential(
             conv3x3(3, ngf),
@@ -303,12 +297,12 @@ class STAGE2_G(nn.Module):
             nn.ReLU(True),
             nn.Conv2d(ngf * 2, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True)).to(self.device)
+            nn.ReLU(True))
         self.hr_joint = nn.Sequential(
             conv3x3(self.ef_dim + ngf * 4, ngf * 4),
             nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True)).to(self.device)
-        self.residual = self._make_layer(ResBlock, ngf * 4).to(self.device)
+            nn.ReLU(True))
+        self.residual = self._make_layer(ResBlock, ngf * 4)
         # --> 2ngf x 32 x 32
         self.upsample1 = upBlock(ngf * 4, ngf * 2)
         # --> ngf x 64 x 64
