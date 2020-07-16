@@ -65,11 +65,11 @@ def load_model(args, stage=1, path=None, device=None):
             dis.load_state_dict(torch.load(path['dis1']))
 
     elif stage == 2:
-        gen1 = STAGE1_G(args)
+        gen1 = STAGE1_G(args).to(device)
         if path:
             gen1.load_state_dict(torch.load(path['gen1']))
-        gen = STAGE2_G(gen1, args)
-        dis = STAGE2_D(args)
+        gen = STAGE2_G(gen1, args).to(device)
+        dis = STAGE2_D(args).to(device)
         if path['gen2'] != '':
             gen.load_state_dict(torch.load(path['gen2']))
             dis.load_state_dict(torch.load(path['dis2']))
