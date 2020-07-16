@@ -138,8 +138,8 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             # loading each batch
             text, audio, image = data
             print(f'Currently running batch {i}')
-            text, audio, image = torch.tensor(text).to(device), torch.tensor(audio).to(device),\
-                torch.tensor(image).to(device)
+            text, audio, image = torch.tensor(text).to(device).type(torch.float32), torch.tensor(audio).to(device).type(torch.float32),\
+                torch.tensor(image).to(device).type(torch.float32)
             BATCHSIZE = text.shape[0]
 
             noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
