@@ -9,6 +9,8 @@ import torch.nn.functional as F
 # from normal dist
 ############################
 
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
 
 def weights_init(m):
     classname = m.__class__.__name__
