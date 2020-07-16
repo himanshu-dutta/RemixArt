@@ -134,6 +134,7 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
         for i, data in enumerate(dataloader):
 
             print(f'Currently running batch {i}')
+            print(f'Currently running batch {i}')
             # loading each batch
             text, audio, image = data
             print(f'Currently running batch {i}')
