@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from sgan.model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
+from .model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
 
 ############################
 # General Utility
@@ -138,8 +138,8 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             # loading each batch
             text, audio, image = data
             print(f'Currently running batch {i}')
-            text, audio, image = text.to(device), audio.to(device),\
-                image.to(device)
+            text, audio, image = torch.tensor(text).to(device), torch.tensor(audio).to(device),\
+                torch.tensor(image).to(device)
             BATCHSIZE = text.shape[0]
 
             noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
@@ -272,8 +272,8 @@ class DataSet(Dataset):
             neg = False
         idx = idx // self.folds
 
-        text = torch.tensor(self.text_embedding[idx])
-        audio = torch.tensor(self.audio_embedding[idx])
+        text = (self.text_embedding[idx])
+        audio = (self.audio_embedding[idx])
 
         id = self.text_labels[idx]
         genre = list(self.mapping[self.mapping['id'] == id].genre)[0].lower()
@@ -289,4 +289,4 @@ class DataSet(Dataset):
 
         img = self.__process_image(self.images[cls][img_idx])
 
-        return text.type(torch.float32), audio.type(torch.float32), img.type(torch.float32)
+        return text, audio, img
