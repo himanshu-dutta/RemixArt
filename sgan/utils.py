@@ -136,13 +136,13 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             print(f'Currently running batch {i}')
             # loading each batch
             text, audio, image = data
+            print(f'Currently running batch {i}')
             text, audio, image = text.to(device), audio.to(device),\
                 image.to(device)
             BATCHSIZE = text.shape[0]
 
             noise = torch.randn(BATCHSIZE, args['Z_DIM']).to(device)
 
-            print(f'Currently running batch {i}')
             # generating labels for data
             zeros = torch.zeros(int(BATCHSIZE), 1).to(device)
             ones = torch.ones(int(BATCHSIZE), 1).to(device)
