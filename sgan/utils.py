@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
-from model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
+from .model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
 
 ############################
 # General Utility
