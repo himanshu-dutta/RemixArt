@@ -52,6 +52,7 @@ class T2O(nn.Module):
         )
 
     def forward(self, embedding):
+        print(embedding.device)
         return self.model(embedding)
 
 
@@ -71,7 +72,7 @@ class CA_NET(nn.Module):
         return mu, logvar
 
     def reparametrize(self, mu, logvar):
-        prin(mu.device, logvar.device)
+        print(mu.device, logvar.device)
         std = logvar.mul(0.5).exp_()
         eps = torch.Tensor(std.size()).normal_()
         return eps.mul(std).add_(mu)
