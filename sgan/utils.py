@@ -266,14 +266,13 @@ class DataSet(Dataset):
             for every embedding it returns 50% mismatched data
             and 50% matching data
         '''
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         neg = False
         if idx % self.folds / self.folds >= 0.5:
             neg = False
         idx = idx // self.folds
 
-        text = torch.tensor(self.text_embedding[idx]).to(device)
-        audio = torch.tensor(self.audio_embedding[idx]).to(device)
+        text = torch.tensor(self.text_embedding[idx])
+        audio = torch.tensor(self.audio_embedding[idx])
 
         id = self.text_labels[idx]
         genre = list(self.mapping[self.mapping['id'] == id].genre)[0].lower()
@@ -289,4 +288,4 @@ class DataSet(Dataset):
 
         img = self.__process_image(self.images[cls][img_idx])
 
-        return text.float(), audio.float(), img.float()
+        return text.type(torch.float32), audio.type(torch.float32), img.type(torch.float32)
