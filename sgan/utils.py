@@ -98,7 +98,7 @@ def save_model(gen, dis, args, epochs, timestamp=None):
 
 def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2):
     if not device:
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cpu")
     # initializing the logger
     if not timestamp:
         timestamp = datetime.now().strftime('%Y%m%d%H%M')
