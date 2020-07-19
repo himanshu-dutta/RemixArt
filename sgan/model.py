@@ -408,7 +408,7 @@ class STAGE2_D(nn.Module):
         self.outlogits = nn.Sequential(
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
+            nn.Conv2d(ndf * 8, 1, kernel_size=3, stride=3),
             nn.Flatten(),
             nn.Sigmoid())
 

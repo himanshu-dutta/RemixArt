@@ -10,12 +10,11 @@ from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
 from datetime import datetime
+import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
-
-from model import STAGE1_G, STAGE1_D, STAGE2_G, STAGE2_D, weights_init
 
 ############################
 # General Utility
@@ -56,44 +55,85 @@ def KL_Div(mu, var, fact):
 def load_model(args, stage=1, path=None, device=None):
     if not device:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+    G_loss = None
+    D_loss = None
+    epoch = 0
+    gen_para = []
     if stage == 1:
         gen = STAGE1_G(args).to(device)
         dis = STAGE1_D(args).to(device)
         if path:
-            gen.load_state_dict(torch.load(path['gen1']))
-            dis.load_state_dict(torch.load(path['dis1']))
+            checkpoint = torch.load(path['stage1'])
+            gen.load_state_dict(checkpoint['gen_state_dict'])
+            dis.load_state_dict(checkpoint['dis_state_dict'])
+        for p in gen.parameters():
+            if p.requires_grad:
+                gen_para.append(p)
+        gen_optim = optim.Adam(
+            gen_para, lr=args['GENERATOR_LR'], betas=(0.5, 0.999))
+        dis_optim = optim.Adam(
+            dis.parameters(), lr=args['DISCRIMINATOR_LR'], betas=(0.5, 0.999))
+        if path:
+            gen_optim.load_state_dict(checkpoint['gen_optimizer_state_dict'])
+            dis_optim.load_state_dict(checkpoint['dis_optimizer_state_dict'])
+            G_loss = checkpoint['G_loss']
+            D_loss = checkpoint['D_loss']
+            epoch = checkpoint['epoch']
 
     elif stage == 2:
-        gen1 = STAGE1_G(args)
+        gen1 = STAGE1_G(args).to(device)
         if path:
+            checkpoint = torch.load(path['stage1'])
             gen1.load_state_dict(torch.load(path['gen1']))
-        gen = STAGE2_G(gen1, args)
-        dis = STAGE2_D(args)
-        if path['gen2'] != '':
-            gen.load_state_dict(torch.load(path['gen2']))
-            dis.load_state_dict(torch.load(path['dis2']))
+        gen = STAGE2_G(gen1, args).to(device)
+        dis = STAGE2_D(args).to(device)
+        if path['stage2'] != '':
+            checkpoint = torch.load(path['stage2'])
+            gen.load_state_dict(checkpoint['gen_state_dict'])
+            dis.load_state_dict(checkpoint['dis_state_dict'])
+        for p in gen.parameters():
+            if p.requires_grad:
+                gen_para.append(p)
+        gen_optim = optim.Adam(
+            gen_para, lr=args['GENERATOR_LR'], betas=(0.5, 0.999))
+        dis_optim = optim.Adam(
+            dis.parameters(), lr=args['DISCRIMINATOR_LR'], betas=(0.5, 0.999))
+        if path['stage2'] != '':
+            gen_optim.load_state_dict(checkpoint['gen_optimizer_state_dict'])
+            dis_optim.load_state_dict(checkpoint['dis_optimizer_state_dict'])
+            G_loss = checkpoint['G_loss']
+            D_loss = checkpoint['D_loss']
+            epoch = checkpoint['epoch']
 
-    gen.apply(weights_init)
-    dis.apply(weights_init)
+    if not path:
+        gen.apply(weights_init)
+        dis.apply(weights_init)
 
-    return gen, dis
+    return gen, dis, gen_optim, dis_optim, G_loss, D_loss, epoch
 
 
-def save_model(gen, dis, args, epochs, timestamp=None):
+def save_model(gen, dis, gen_optim, dis_optim, G_loss, D_loss, args, epochs, timestamp=None):
+    checkpoint = {
+        'epoch': epochs,
+        'gen_state_dict': gen.state_dict(),
+        'dis_state_dict': dis.state_dict(),
+        'gen_optimizer_state_dict': gen_optim.state_dict(),
+        'dis_optimizer_state_dict': dis_optim.state_dict(),
+        'G_loss': G_loss,
+        'D_loss': D_loss,
+    }
+
     if not timestamp:
         timestamp = datetime.now().strftime('%Y%m%d%H%M')
-    dir_ = os.path.join(args['SAVE_MODEL'], timestamp, f"stage{args['STAGE']}")
+    dir_ = args['SAVE_MODEL']
     if not os.path.exists(dir_):
         os.makedirs(dir_)
     torch.save(
-        gen.state_dict(),
-        os.path.join(dir_, f"gen_{args['STAGE']}_{epochs}.pth"))
-    torch.save(
-        dis.state_dict(),
-        os.path.join(dir_, f"dis_{args['STAGE']}_{epochs}.pth"))
+        checkpoint,
+        os.path.join(dir_, f"model_{args['STAGE']}_{epochs}.tar"))
     print_styled(
         f"Model for stage {args['STAGE']} for epoch {epochs} saved at {dir_}...")
+    return os.path.join(dir_, f"model_{args['STAGE']}_{epochs}.tar")
 
 
 def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2):
@@ -110,30 +150,20 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
     # loading the models
     epochs = args['MAX_EPOCH']
     stage = args['STAGE']
-    gen, dis = load_model(args, stage, path, device)
+    gen, dis, gen_optim, dis_optim, G_loss, D_loss, last_epoch = load_model(
+        args, stage, path, device)
 
     start = time.time()
 
-    # optimizer and loss
-    gen_para = []
-    for p in gen.parameters():
-        if p.requires_grad:
-            gen_para.append(p)
-
-    gen_optim = optim.Adam(
-        gen_para, lr=args['GENERATOR_LR'], betas=(0.5, 0.999))
-    dis_optim = optim.Adam(
-        dis.parameters(), lr=args['DISCRIMINATOR_LR'], betas=(0.5, 0.999))
-
-    for epoch in tqdm(range(epochs)):
+    for epoch in tqdm(range(last_epoch, epochs)):
         print_styled(f'Running epoch:{epoch}...')
 
         G_loss_run = 0.0
         D_loss_run = 0.0
 
         for i, data in enumerate(dataloader):
-
-            print(f'Currently running batch {i}')
+            if i % 50 == 0:
+                print(f'Currently running batch {i}')
             # loading each batch
             text, audio, image = data
             text, audio, image = text.to(device), audio.to(device),\
@@ -151,7 +181,6 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
             #     writer.add_graph(gen, (text, audio, noise))
 
             # generating discriminator data
-
             _, img_f, mu_f, logvar_f = gen(text, audio, noise)
             D_real = dis(image.detach())
             D_fake = dis(img_f.detach())
@@ -197,10 +226,20 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
                                   0], epoch*BATCHSIZE+i)
 
         if epoch % args['SNAPSHOT_INTERVAL'] == 0:
-            save_model(gen, dis, args, epoch, timestamp)
+            saved_model = save_model(
+                gen, dis, gen_optim, dis_optim, G_loss, D_loss, args, epoch, timestamp)
+            #########################
+            #  specific to cloud env
+            #########################
+            # upload_blob(saved_model, saved_model)
+            # upload_local_directory_to_gcs('logs', 'logs')
+            # os.remove(saved_model)
+
         # printing loss after each epoch
         print_styled('Epoch:{},   G_loss:{},   D_loss:{}'.format(
             epoch, G_loss_run/(i+1), D_loss_run/(i+1)))
+        plt.imshow(np.moveaxis(img_f.cpu()[0].detach().numpy(), 0, 2))
+        plt.show()
     save_model(gen, dis, args, epoch, timestamp)
     print_styled(f'Model training took {(time.time()-start)/60} mins.')
     writer.close()
@@ -265,6 +304,7 @@ class DataSet(Dataset):
         '''
             for every embedding it returns 50% mismatched data
             and 50% matching data
+            depends on the tweak with neg
         '''
         neg = False
         if idx % self.folds / self.folds >= 0.5:
