@@ -8,7 +8,7 @@ incorporate inputs from three unique channels, and with that, we train it to lea
 
 _Adding the notes and changes related to the project, to keep track of it._
 
-_Generating Album Art using 3 channels of input, Audio, Images and Text._
+_Generating Album Art using ~3~ 2 channels of input, Audio, ~Images~ and/or Text._
 
 # Himanshu's:
 
@@ -23,3 +23,16 @@ _Generating Album Art using 3 channels of input, Audio, Images and Text._
 - [x] Deciding on the Data Source
 - [ ] Storage and Retrival for efficinet processing, locally or over cloud buckets.
 - [ ] ~Choice of Databse that would work well with the project.~
+
+# Citation:
+
+We leveraged the architecture of Stack GAN model in pytorch, with updates to the recent version of it, made fair share of modifications in terms of both, the procedure the original model followed along with the changes made to the conditional augmentation technique as well as embedding representation, with a vanilla model consisting of one dense layer and relu unit.
+
+```
+@inproceedings{han2017stackgan,
+Author = {Han Zhang and Tao Xu and Hongsheng Li and Shaoting Zhang and Xiaogang Wang and Xiaolei Huang and Dimitris Metaxas},
+Title = {StackGAN: Text to Photo-realistic Image Synthesis with Stacked Generative Adversarial Networks},
+Year = {2017},
+booktitle = {{ICCV}},
+}
+```
