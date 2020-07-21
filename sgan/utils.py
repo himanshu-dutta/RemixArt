@@ -52,6 +52,12 @@ def KL_Div(mu, var, fact):
 ############################
 
 
+def adjust_lr(optimizer, epoch, init_lr, args):
+    lr = init_lr * (0.1 ** (epoch // args['LR_DECAY_EPOCH']))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
 def load_model(args, stage=1, path=None, device=None):
     if not device:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -160,6 +166,9 @@ def train(dataloader, args, path=None, device=None, timestamp=None, KL_factor=2)
 
         G_loss_run = 0.0
         D_loss_run = 0.0
+
+        adjust_lr(dis_optim, epoch, args['DISCRIMINATOR_LR'], args)
+        adjust_lr(gen_optim, epoch, args['GENERATOR_LR'], args)
 
         for i, data in enumerate(dataloader):
             if i % 50 == 0:
